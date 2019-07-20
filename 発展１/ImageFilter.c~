@@ -1,0 +1,469 @@
+//=====================================================================//
+//                                                                     //
+//  ファイル名 : ImageFilter.c                                         //
+//  内      容 : PPM(Portable PixMap) または PGM(Portable GrayMap)形式 //
+//               のデータを画像処理する関数の定義                      //
+//  更  新  日 : 2004. 2. 14 木村 彰徳 (Computer Graphics Lab.)        //
+//               2003. 3. 21 駒井 教平 (Computer Vision & Games Lab.)  //
+//                                                                     //
+//=====================================================================//
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <ctype.h>
+
+#include "ImageFilter.h"
+
+#include "ImageFileIO.h"
+#include "ImageTools.h"
+
+//---------------------------------------------------------------------//
+// 例１）                                                              //
+// void  NegativeImage(void)                                           //
+//  内      容 : PPM形式の入力データをネガ画像に変換                   //
+//  更  新  日 : 2004. 2. 11 木村 彰徳 (Computer Graphics Lab.)        //
+//---------------------------------------------------------------------//
+void NegativeImage(void) {
+
+    int iWidth, iHeight, iMaxValue;   // 画像の幅，高さ，解像度
+    struct RGB * pRGBInputData;       // 入力データを格納
+    struct RGB * pRGBOutputData;      // 画像処理したデータを格納
+    int i;                            // ループカウンタ
+
+    // ネガ画像
+    printf("\n**** Negative Image *****\n");
+
+    // PPM形式の入力データの読み込み
+    pRGBInputData = ReadPpm(&iWidth, &iHeight, &iMaxValue);
+    
+    // 出力データ（１次元）のメモリ領域の確保
+    // pRGBOutputData[iWidth*iHeight]
+    pRGBOutputData = (struct RGB *)malloc(iWidth*iHeight*sizeof(struct RGB));
+
+    // 入力データ(pRGBInputmData)のRGBの値を反転して，
+    // 出力データ(pRGBOutputData)に保存
+    for(i = 0; i < iWidth*iHeight; i++){
+	pRGBOutputData[i].iRed   = iMaxValue - pRGBInputData[i].iRed;
+	pRGBOutputData[i].iGreen = iMaxValue - pRGBInputData[i].iGreen;
+	pRGBOutputData[i].iBlue  = iMaxValue - pRGBInputData[i].iBlue;
+    }
+
+    // 入力データを保存しているメモリ領域を解放
+    FreePpm(pRGBInputData);
+
+    // PPM形式のファイルに出力データを出力
+    WritePpm(pRGBOutputData, iWidth, iHeight, iMaxValue);
+
+    // 出力データを保存しているメモリ領域を解放
+    FreePpm(pRGBOutputData);
+}
+
+
+//---------------------------------------------------------------------//
+// 例2）                                                              //
+// void DrawLines(void)                                                //
+//  内      容 : PGM形式のデータに線を描く　　                         //
+//  更  新  日 : 2004. 2. 12 木村 彰徳 (Computer Graphics Lab.)        //
+//---------------------------------------------------------------------//
+void DrawLines(void) {
+    
+    
+    int iWidth, iHeight, iMaxValue;     // 画像の幅，高さ，解像度
+    int * piOutputData;                 // 画像処理したデータを格納
+    int iIndex;                         // インデックス
+  //  int w, h, x, y;                   // 座標ループカウンタ
+    int iStartX, iStartY, iEndX, iEndY; // 直線の始点と終点座標　
+    int iWHITE;                         // 白の値
+
+
+    // 線を描く
+    printf("\n**** Draw Lines *****\n");
+
+    // 画像の幅，高さ，解像度の指定と白の設定
+    iWidth  = 400;
+    iHeight = 400;
+    iMaxValue = 255;
+    iWHITE = iMaxValue;
+
+    // 出力データ（１次元）のメモリ領域の確保
+    // piOutputData[iWidth*iHeight]
+    piOutputData = (int *)malloc(iWidth*iHeight*sizeof(int));
+
+    // 画素を白で初期化
+    for(iIndex = 0; iIndex < iWidth*iHeight; iIndex++)
+	piOutputData[iIndex] = iWHITE;
+
+
+    // 出力データ(piOutputData)に線を描く
+    iStartX = 0; iStartY = 0;
+    iEndY = iHeight;
+    for(iEndX = iWidth - 1; iEndX >= 0; iEndX-=5) {
+	DrawStraightLine(piOutputData, iWidth, iHeight, iMaxValue,
+			 iStartX, iStartY, iEndX, iEndY, SOLID, BLACKLINE);
+    }
+    iEndX = iWidth;
+    for(iEndY = iHeight - 1; iEndY >= 0; iEndY-=5) {
+	DrawStraightLine(piOutputData, iWidth, iHeight, iMaxValue,
+			 iStartX, iStartY, iEndX, iEndY, SOLID, BLACKLINE);
+    }
+
+    // PGM形式のファイルに出力データを出力
+    WritePgm(piOutputData, iWidth, iHeight, iMaxValue);
+
+    // 出力データを保存しているメモリ領域を解放
+    FreePgm(piOutputData);
+}
+//---------------------------------------------------------------------//
+// 1）                                                               //
+// void GrayscaleImage(void)                                　//
+//  内      容 : 濃淡画像の生成                         　　　　　　　 　//
+//---------------------------------------------------------------------//
+void GrayscaleImage(void) {
+
+    int iWidth, iHeight, iMaxValue;   // 画像の幅，高さ，解像度
+    struct RGB * pRGBInputData;       // 入力データを格納
+    int * pYOutputData;      // YIQを定義
+    int i;                            // ループカウンタ
+    int a,b,c;
+
+    // ネガ画像
+    printf("\n**** Grayscale Image *****\n");
+
+    // PPM形式の入力データの読み込み
+    pRGBInputData = ReadPpm(&iWidth, &iHeight, &iMaxValue);
+    
+    // 出力データ（１次元）のメモリ領域の確保
+   // pRGBOutputData[iWidth*iHeight]
+    pYOutputData = (int *)malloc(iWidth*iHeight*sizeof(int));
+
+
+    // 出力データ(pRGBOutputData)に保存
+    a = 0.3 * 1024;
+    b = 0.6 * 1024;
+    c = 0.1 * 1024;
+
+    for(i = 0; i < iWidth*iHeight; i++){
+	pYOutputData[i] = (a*pRGBInputData[i].iRed +
+                            b*pRGBInputData[i].iGreen +
+	                     c*pRGBInputData[i].iBlue) / 1024;
+    }
+    // 入力データを保存しているメモリ領域を解放
+    FreePpm(pRGBInputData);
+
+    // PPM形式のファイルに出力データを出力
+    WritePgm(pYOutputData, iWidth, iHeight, iMaxValue);
+
+    // 出力データを保存しているメモリ領域を解放
+    FreePgm(pYOutputData);
+}
+//---------------------------------------------------------------------//
+// 2）                                                               //
+// void brightness(void)                                   　//
+//  内      容 : histogramの生成                         　　　　　　　 　//
+//---------------------------------------------------------------------//
+void BrightnessHistogram(void){
+
+    int iWidth, iHeight, iMaxValue;
+    int * pYInputData;
+    int i, j ,r;
+    int brightness[256];
+    FILE * histogram;
+
+    printf("\n**** Brightness Histogram *****\n");
+    pYInputData = ReadPgm(&iWidth, &iHeight, &iMaxValue);
+
+    for(i=0; i<256 ;i++){
+       brightness[i] = 0;
+     }
+    
+    for(j=0; j<iWidth*iHeight; j++){
+       brightness[pYInputData[j]] ++;
+     }
+     
+    histogram = fopen("hist.data", "w+");
+
+    if ((histogram = fopen("hist.data", "w+")) == NULL)  
+       printf("cannot open file!\n");  
+    
+    for(r=0; r<256; r++){
+       fprintf(histogram, "%d\t", r);
+       fprintf(histogram, "%d\n", brightness[r]);
+     }
+    fclose(histogram);
+     
+     FreePgm(pYInputData);
+}   
+void BlackWhiteImage(void){
+ 
+    int threshold = 192;
+    int iWidth, iHeight, iMaxValue;
+    int * pYInputData;
+    int * pOutputData; 
+    int i;
+
+    printf("\n**** BlackWhite Image *****\n");
+
+    // PPM形式の入力データの読み込み
+    pYInputData = ReadPgm(&iWidth, &iHeight, &iMaxValue);
+    
+    // 出力データ（１次元）のメモリ領域の確保
+   // pRGBOutputData[iWidth*iHeight]
+    pOutputData = (int *)malloc(iWidth*iHeight*sizeof(int));
+
+    for(i = 0; i < iWidth*iHeight; i++){
+        if(pYInputData[i]>threshold)
+           pOutputData[i] = 255;
+        else
+           pOutputData[i] = 0;
+    }
+    // 入力データを保存しているメモリ領域を解放
+    FreePgm(pYInputData);
+
+    // PPM形式のファイルに出力データを出力
+    WritePgm(pOutputData, iWidth, iHeight, iMaxValue);
+
+    // 出力データを保存しているメモリ領域を解放
+    FreePgm(pOutputData);
+}
+
+//---------------------------------------------------------------------//
+// 3）                                                               //
+// void EdgeDetection(void)                                   　//
+//  内      容 : エッジの検出                         　　　　　　　 　//
+//---------------------------------------------------------------------//
+
+void Templatematching(void) {
+ int iWidth, iHeight, iMaxValue;
+ int * pInputData;
+ int * pOutputData;
+ int * pattenData;
+ int i, j;
+ int x, y;
+ int M, N;
+ int X=0, Y=0;
+ double Ta, Tb;
+ double WT, Wa, Wb;
+ double * R;
+ double Buff = -1;
+ FILE * file_x;
+ FILE * file_y;
+ file_x = fopen("file_x.data", "w+");
+ file_y = fopen("file_y.data", "w+");
+
+ pInputData = ReadPgm( & iWidth, & iHeight, & iMaxValue);
+ pattenData = ReadPgm( & M, & N, & iMaxValue);
+ pOutputData = (int * ) malloc(M * N * sizeof(int));
+ R = (double * ) malloc((iWidth - M + 1) * (iHeight - N + 1) * sizeof(double));
+
+ printf("\n**** Now Templatematching *****\n");
+ printf("\n**** Please Wait *****\n");
+
+ //テンプレート画像の輝度値の合計を求める
+ Ta = 0;
+ Tb = 0;
+ for (i = 0; i < M - 1; i++) {
+  for (j = 0; j < N - 1; j++) {
+   Ta += pattenData[j * M + i];
+   Tb += pattenData[j * M + i] * pattenData[j * M + i];
+  }
+ }
+
+ //探索画像の点(K-M+1)*(L-N+1)について注目する
+ for (x = 0; x < iWidth - M; x++) {
+  for (y = 0; y < iHeight - N; y++) {
+   WT = 0;
+   Wa = 0;
+   Wb = 0;
+   //テンプレート画像との正規化相関を求める
+   for (i = 0; i < M - 1; i++) {
+    for (j = 0; j < N - 1; j++) {
+     WT += pInputData[x + i + iWidth * (y + j)] * pattenData[i + j * M];
+     Wa += pInputData[x + i + iWidth * (y + j)];
+     Wb += pInputData[x + i + iWidth * (y + j)] * pInputData[x + i + iWidth * (y + j)];
+    }
+   }
+   R[x + y * (iWidth - M + 1)] = (double)((WT - Wa * Ta / (double)(M * N)) / sqrt((Wb - Wa * Wa / (double)(M * N)) * (Tb - Ta * Ta / (double)(M * N))));
+   //探索した点の中で一番相関が強い場所を記憶する
+   if (Buff < R[x + y * (iWidth - M + 1)]) {
+    X = x;
+    Y = y;
+    Buff = R[x + y * (iWidth - M + 1)];
+   }
+  }
+ }
+
+ //出力の部分
+ for (i = 0; i < M - 1; i++) {
+  for (j = 0; j < N - 1; j++) {
+   pOutputData[i + j * M] = pInputData[X + i + (Y + j) * iWidth];
+  }
+ }
+ WritePgm(pOutputData, M, N, iMaxValue);
+ for (i = 0; i < iWidth - M; i++) {
+  fprintf(file_x, "%d\t", i);
+  fprintf(file_x, "%f\n", R[i + Y * (iWidth - M + 1)]);
+ }
+ for (i = 0; i < iHeight - N; i++) {
+  fprintf(file_y, "%d\t", i);
+  fprintf(file_y, "%f\n", R[X + i * (iWidth - M + 1)]);
+ }
+ FreePgm(pInputData);
+ FreePgm(pattenData);
+ FreePgm(pOutputData);
+}
+
+//---------------------------------------------------------------------//
+// 5）                                                               //
+// void MosaicImage(void)                                   　//
+//  内      容 : モザイク画像の生成                         　　　　　　　 　//
+//---------------------------------------------------------------------//
+void MosaicImage(void) {
+
+ int iWidth, iHeight, iMaxValue;
+ int * pInputData;
+ int * pOutputData;
+ int i, j;
+ int n;
+ int N, M;
+ int Value;
+ pInputData = ReadPgm( & iWidth, & iHeight, & iMaxValue);
+ pOutputData = (int * ) malloc(iWidth * iHeight * sizeof(int));
+
+ printf("nの値を入力してください");
+ scanf("%d", & n);
+
+ printf("\n**** Now Mosaicing *****\n");
+ printf("\n**** Please Wait *****\n");
+
+ for (i = 0; i < iWidth / n; i++) {
+  for (j = 0; j < iHeight / n; j++) {
+   Value = 0;
+   for (M = 0; M < n; M++) {
+    for (N = 0; N < n; N++) {
+     Value += pInputData[(j * n + N) * iWidth + i * n + M];
+    }
+   }
+   for (M = 0; M < n; M++) {
+    for (N = 0; N < n; N++) {
+     pOutputData[(j * n + N) * iWidth + i * n + M] = Value / (n * n);
+    }
+   }
+  }
+ }
+
+ WritePgm(pOutputData, iWidth, iHeight, iMaxValue);
+ FreePgm(pOutputData);
+
+}
+
+//---------------------------------------------------------------------//
+// 6）                                                               //
+// void HoughTransform(void)                                   　//
+//  内      容 : ハフ変換による直線抽出                         　　　　　　　 　//
+//---------------------------------------------------------------------//
+
+#define PI 3.1415926
+void HoughTransform(void) {
+
+ int iWidth, iHeight, iMaxValue;
+ int * piInputData;
+ int * piOutputData;
+ int * piOutputData2;
+ int i, j, x, y;
+ int n = 180;
+ double T = PI / n;
+ double * SIN;
+ double * COS;
+ double R;
+ int Rmax, Rmax2;
+ int max = 0;
+
+ printf("\n***** HoughTransform *****\n");
+
+ piInputData = ReadPgm( & iWidth, & iHeight, & iMaxValue);
+
+ Rmax = (int) sqrt(iWidth * iWidth + iHeight * iHeight) + 1;
+ Rmax2 = 2 * Rmax;
+
+ piOutputData = (int * ) malloc(n * Rmax2 * sizeof(int));
+ piOutputData2 = (int * ) malloc(iWidth * iHeight * sizeof(int));
+ SIN = (double * ) malloc(n * sizeof(double));
+ COS = (double * ) malloc(n * sizeof(double));
+
+printf("\n***** HoughTransforming Loading *****\n");
+ for (i = 0; i < n; i++) {
+  SIN[i] = sin(T * i);
+  COS[i] = cos(T * i);
+ }
+ for (i = 0; i < (Rmax2 * n); i++) {
+  piOutputData[i] = 0;
+ }
+ for (i = 0; i < (iWidth * iHeight); i++) {
+  piOutputData2[i] = 0;
+ }
+ for (y = 0; y < iHeight; y++) {
+  for (x = 0; x < iWidth; x++) {
+   if (piInputData[y * iWidth + x] == 255) {
+    for (i = 0; i < n; i++) {
+     R = (int)(x * COS[i] + y * SIN[i] + 0.5);
+     piOutputData[(int)((R + Rmax) * n + i)]++;
+    }
+   }
+  }
+ }
+ for (i = 0; i < Rmax2 * n; i++) {
+  if (piOutputData[i] > max)
+   max = piOutputData[i];
+ }
+ for (i = 0; i < Rmax2 * n; i++) {
+  piOutputData[i] = piOutputData[i] * 255 / max;
+ }
+printf("\n***** HoughTransform Success *****\n");
+
+
+printf("\n***** Inverse HoughTransform Loading *****\n");
+ for (i = 0; i < n; i++) {
+  for (j = 0; j < Rmax2; j++) {
+   if (piOutputData[j * n + i] > 50) {
+    if (
+     piOutputData[j * n + i] >= piOutputData[j * n + i - 1] &&
+     piOutputData[j * n + i] >= piOutputData[j * n + i + 1] &&
+     piOutputData[j * n + i] >= piOutputData[(j + 1) * n + i] &&
+     piOutputData[j * n + i] >= piOutputData[(j + 1) * n + i - 1] &&
+     piOutputData[j * n + i] >= piOutputData[(j + 1) * n + i + 1] &&
+     piOutputData[j * n + i] >= piOutputData[(j - 1) * n + i] &&
+     piOutputData[j * n + i] >= piOutputData[(j - 1) * n + i - 1] &&
+     piOutputData[j * n + i] >= piOutputData[(j - 1) * n + i + 1])
+      {
+      if (i == 0 || i == 180) {
+       for (y = 0; y < iHeight; y++) {
+        x = (int)(-y * (SIN[i] / COS[i]) + ((j - Rmax) / COS[i]));
+        if (x >= 0 && x <= iWidth) {
+         piOutputData2[y * iWidth + x] = 255;
+        }
+       }
+      } else {
+       for (x = 0; x < iWidth; x++) {
+        y = (int)(-(COS[i] / SIN[i]) * x + ((j - Rmax) / SIN[i]));
+        if (y >= 0 && y <= iHeight) {
+         piOutputData2[y * iWidth + x] = 255;
+        }
+       }
+      }
+     }
+   }
+  }
+ }
+printf("\n***** Inverse HoughTransform Success *****\n");
+
+ // 入力データを保存しているメモリ領域を解放
+ FreePgm(piInputData);
+ //PGM 形式のファイルに出力データを出力
+ WritePgm(piOutputData, n, Rmax2, iMaxValue);
+ WritePgm(piOutputData2, iWidth, iHeight, iMaxValue);
+ // 出力データを保存しているメモリ領域を解放
+ FreePgm(piOutputData);
+ FreePgm(piOutputData2);
+}
+
+
